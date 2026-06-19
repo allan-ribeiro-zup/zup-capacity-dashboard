@@ -50,9 +50,8 @@ STATUS_COLORS = {
     "Despriorizado":"#D5D8DC",
 }
 
-# ── Google Drive ──────────────────────────────────────────────────
-GDRIVE_FILE_ID = "1IFhx6IEksLFI0AzVSZHDroaw8GKnw7yA"
-GDRIVE_URL     = f"https://docs.google.com/spreadsheets/d/{GDRIVE_FILE_ID}/export?format=xlsx"
+# ── GitHub ───────────────────────────────────────────────────────
+GITHUB_URL = "https://raw.githubusercontent.com/allan-ribeiro-zup/zup-capacity-dashboard/main/template_capacity_zup.xlsx"
 
 # ── Sidebar ───────────────────────────────────────────────────────
 with st.sidebar:
@@ -88,15 +87,7 @@ def safe_pct(df, col, val):
 @st.cache_data(show_spinner="Carregando dados do Google Drive...", ttl=300)
 def load():
     try:
-        import re
-        session = requests.Session()
-        resp = session.get(GDRIVE_URL, timeout=30, allow_redirects=True)
-        # Lida com página de confirmação antivírus do Google Drive
-        if b"confirm=" in resp.content:
-            confirm = re.search(r'confirm=([^&]+)', resp.text)
-            if confirm:
-                url2 = GDRIVE_URL + "&confirm=" + confirm.group(1)
-                resp = session.get(url2, timeout=30, allow_redirects=True)
+        resp = requests.get(GITHUB_URL, timeout=30)
         resp.raise_for_status()
         file_content = io.BytesIO(resp.content)
         xls   = pd.ExcelFile(file_content, engine="openpyxl")
@@ -124,12 +115,12 @@ def load():
         return {"ok": False, "erro": str(e)}
 
 # ── Carrega dados ─────────────────────────────────────────────────
-with st.spinner("Conectando ao Google Drive..."):
+with st.spinner("Carregando dados do GitHub..."):
     data = load()
 
 if not data.get("ok"):
     st.error(f"❌ Erro ao carregar planilha: {data.get('erro','')}")
-    st.info("Verifique se o arquivo está compartilhado como 'Qualquer pessoa com o link pode visualizar'.")
+    st.info("Verifique se o arquivo 'template_capacity_zup.xlsx' está no repositório GitHub.")
     st.stop()
 
 roadmap   = data["roadmap"]
