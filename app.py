@@ -52,7 +52,7 @@ STATUS_COLORS = {
 
 # ── Google Drive ──────────────────────────────────────────────────
 GDRIVE_FILE_ID = "1IFhx6IEksLFI0AzVSZHDroaw8GKnw7yA"
-GDRIVE_URL     = f"https://drive.google.com/uc?export=download&id={GDRIVE_FILE_ID}"
+GDRIVE_URL     = f"https://docs.google.com/spreadsheets/d/{GDRIVE_FILE_ID}/export?format=xlsx"
 
 # ── Sidebar ───────────────────────────────────────────────────────
 with st.sidebar:
