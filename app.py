@@ -664,7 +664,7 @@ elif pagina == "👤 Gestão de Pessoas":
         if not sem_proj.empty:
             show = [c for c in ["Zupper","Perfil","Day Off 1","Day Off 2", total_col] if c in sem_proj.columns]
             st.dataframe(
-                sem_proj[show].style.applymap(lambda _: "background-color:#FFD9B3", subset=["Zupper"] if "Zupper" in show else []),
+                sem_proj[show].style.map(lambda _: "background-color:#FFD9B3", subset=["Zupper"] if "Zupper" in show else []),
                 use_container_width=True, hide_index=True
             )
         else:
@@ -791,7 +791,7 @@ elif pagina == "👤 Gestão de Pessoas":
                 if isinstance(val, int) and val >= 3: return "background-color:#FFCDD2"
                 if isinstance(val, int) and val == 2: return "background-color:#FFF9C4"
                 return ""
-            styled_alert = df_alert.style.applymap(color_alert, subset=["Pessoas Ausentes"])
+            styled_alert = df_alert.style.map(color_alert, subset=["Pessoas Ausentes"])
             st.dataframe(styled_alert, use_container_width=True, hide_index=True)
         else:
             st.success("Nenhuma sobreposição crítica de ausências encontrada.")
