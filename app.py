@@ -88,10 +88,18 @@ def safe_pct(df, col, val):
 @st.cache_data(show_spinner="Carregando dados do Google Drive...", ttl=300)
 def load():
     try:
-        resp = requests.get(GDRIVE_URL, timeout=30)
+        import re
+        session = requests.Session()
+        resp = session.get(GDRIVE_URL, timeout=30, allow_redirects=True)
+        # Lida com página de confirmação antivírus do Google Drive
+        if b"confirm=" in resp.content:
+            confirm = re.search(r'confirm=([^&]+)', resp.text)
+            if confirm:
+                url2 = GDRIVE_URL + "&confirm=" + confirm.group(1)
+                resp = session.get(url2, timeout=30, allow_redirects=True)
         resp.raise_for_status()
-        content = io.BytesIO(resp.content)
-        xls   = pd.ExcelFile(content)
+        file_content = io.BytesIO(resp.content)
+        xls   = pd.ExcelFile(file_content, engine="openpyxl")
         names = xls.sheet_names
         def get(name):
             if name in names:
