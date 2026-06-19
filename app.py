@@ -677,8 +677,8 @@ elif pagina == "👤 Gestão de Pessoas":
     with col_a:
         st.markdown('<div class="section-title">Headcount por Projeto</div>', unsafe_allow_html=True)
         if "Projeto" in aus.columns:
-            aus["Projeto"] = aus["Projeto"].fillna("") if "Projeto" in aus.columns else ""
-        hc = aus[aus["Projeto"].astype(str).str.strip() != ""]
+            aus["Projeto"] = aus["Projeto"].fillna("")
+            hc = aus[aus["Projeto"].astype(str).str.strip() != ""]
             hc_cnt = hc["Projeto"].value_counts().reset_index()
             hc_cnt.columns = ["Projeto","Pessoas"]
             fig_hc = px.bar(hc_cnt, x="Pessoas", y="Projeto", orientation="h",
