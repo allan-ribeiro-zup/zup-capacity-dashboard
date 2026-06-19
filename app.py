@@ -104,9 +104,21 @@ def load():
                 df = df.dropna(how="all")
                 return df
             return pd.DataFrame()
+        def get_ferias():
+            nm = "Férias e Ausências" if "Férias e Ausências" in names else "Ausências"
+            if nm not in names:
+                return pd.DataFrame()
+            df = xls.parse(nm, header=2)
+            df.columns = [str(c).strip() for c in df.columns]
+            df = df.dropna(how="all")
+            # Remove linha de subcabeçalho (Início/Fim/Dias)
+            if "Zupper" in df.columns:
+                df = df[df["Zupper"].notna() & (df["Zupper"] != "Zupper")]
+            return df
+
         return {
             "membros":    get("Membros"),
-            "ausencias":  get("Férias e Ausências") if "Férias e Ausências" in names else get("Ausências"),
+            "ausencias":  get_ferias(),
             "cap":        get("Capacidade por Sprint"),
             "roadmap":    get("Roadmap"),
             "atividades": get("Atividades por Release"),
@@ -647,7 +659,8 @@ elif pagina == "👤 Gestão de Pessoas":
     # ── Disponíveis para realocação ──────────────────────────────
     st.markdown('<div class="section-title">⚠️ Zuppers Disponíveis para Realocação</div>', unsafe_allow_html=True)
     if "Projeto" in aus.columns:
-        sem_proj = aus[aus["Projeto"].fillna("").str.strip() == ""].copy()
+        aus["Projeto"] = aus["Projeto"].fillna("")
+        sem_proj = aus[aus["Projeto"].astype(str).str.strip() == ""].copy()
         if not sem_proj.empty:
             show = [c for c in ["Zupper","Perfil","Day Off 1","Day Off 2", total_col] if c in sem_proj.columns]
             st.dataframe(
@@ -664,7 +677,8 @@ elif pagina == "👤 Gestão de Pessoas":
     with col_a:
         st.markdown('<div class="section-title">Headcount por Projeto</div>', unsafe_allow_html=True)
         if "Projeto" in aus.columns:
-            hc = aus[aus["Projeto"].fillna("").str.strip() != ""]
+            aus["Projeto"] = aus["Projeto"].fillna("") if "Projeto" in aus.columns else ""
+        hc = aus[aus["Projeto"].astype(str).str.strip() != ""]
             hc_cnt = hc["Projeto"].value_counts().reset_index()
             hc_cnt.columns = ["Projeto","Pessoas"]
             fig_hc = px.bar(hc_cnt, x="Pessoas", y="Projeto", orientation="h",
@@ -689,7 +703,7 @@ elif pagina == "👤 Gestão de Pessoas":
     # ── Perfis por projeto ─────────────────────────────────────────
     st.markdown('<div class="section-title">Perfis por Projeto</div>', unsafe_allow_html=True)
     if "Projeto" in aus.columns and "Perfil" in aus.columns:
-        proj_perf = aus[aus["Projeto"].fillna("").str.strip() != ""].groupby(
+        proj_perf = aus[aus["Projeto"].astype(str).str.strip() != ""].groupby(
             ["Projeto","Perfil"]).size().reset_index(name="Pessoas")
         fig_pp = px.bar(proj_perf, x="Projeto", y="Pessoas", color="Perfil",
                         barmode="stack", text="Pessoas",
@@ -751,13 +765,13 @@ elif pagina == "👤 Gestão de Pessoas":
 
     # ── Sobreposição de ausências por projeto ─────────────────────
     st.markdown('<div class="section-title">⚠️ Sobreposição de Ausências por Projeto</div>', unsafe_allow_html=True)
+    alertas = []
     if "Projeto" in aus.columns:
-        alertas = []
         for i, mes in enumerate(MESES_NOMES):
             offset_d = 6 + i * 3 + 2
             if offset_d < len(cols):
                 col_d = cols[offset_d]
-                grp = aus[aus["Projeto"].fillna("").str.strip() != ""].copy()
+                grp = aus[aus["Projeto"].astype(str).str.strip() != ""].copy()
                 grp["dias_num"] = pd.to_numeric(grp[col_d], errors="coerce").fillna(0)
                 ausentes = grp[grp["dias_num"] > 0].groupby("Projeto")["Zupper"].apply(list).reset_index()
                 ausentes.columns = ["Projeto","Ausentes"]
