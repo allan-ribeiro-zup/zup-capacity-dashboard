@@ -106,7 +106,7 @@ def load():
             return pd.DataFrame()
         return {
             "membros":    get("Membros"),
-            "ausencias":  get("Férias e Ausências"),
+            "ausencias":  get("Férias e Ausências") if "Férias e Ausências" in names else get("Ausências"),
             "cap":        get("Capacidade por Sprint"),
             "roadmap":    get("Roadmap"),
             "atividades": get("Atividades por Release"),
@@ -437,72 +437,7 @@ elif pagina == "👥 Planejamento das Squads":
         st.info("Preencha a aba 'Membros' no Excel para ver os detalhes do time.")
 
 
-# ════════════════════════════════════════════════════════════════
-# 📅 FÉRIAS E AUSÊNCIAS
-# ════════════════════════════════════════════════════════════════
-elif pagina == "📅 Férias e Ausências":
-    st.markdown("# Calendário de Férias e Ausências")
 
-    if ausencias.empty:
-        st.warning("Sem dados na aba 'Ausências'."); st.stop()
-
-    squads_a = sorted(ausencias["Squad"].dropna().unique()) if "Squad" in ausencias.columns else []
-    tipos_a  = sorted(ausencias["Tipo"].dropna().unique())  if "Tipo"  in ausencias.columns else []
-
-    fa1, fa2 = st.columns(2)
-    with fa1: sq_a = st.multiselect("Squad", squads_a, default=squads_a)
-    with fa2: tp_a = st.multiselect("Tipo",  tipos_a,  default=tipos_a)
-
-    aus = ausencias.copy()
-    if sq_a and "Squad" in aus.columns: aus = aus[aus["Squad"].isin(sq_a)]
-    if tp_a and "Tipo"  in aus.columns: aus = aus[aus["Tipo"].isin(tp_a)]
-
-    total_h = aus["Horas Indisponíveis"].sum() if "Horas Indisponíveis" in aus.columns else 0
-    pessoas = aus["Nome"].nunique()             if "Nome"               in aus.columns else 0
-
-    ka,kb,kc = st.columns(3)
-    ka.markdown(card("Registros",          len(aus)          ), unsafe_allow_html=True)
-    kb.markdown(card("Pessoas c/ Ausência", pessoas, "orange"), unsafe_allow_html=True)
-    kc.markdown(card("Horas Indisponíveis", f"{total_h:.0f}h","red"), unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # Tabela colorida
-    st.markdown('<div class="section-title">Registros de Ausência</div>', unsafe_allow_html=True)
-    tipo_bg = {"Férias":"#BBDEFB","Folga":"#FFF9C4","Licença":"#FFCDD2"}
-
-    def color_tipo(v):
-        return f"background-color:{tipo_bg.get(v,'')}"
-
-    show_a = [c for c in ["Nome","Squad","Tipo","Data Início","Data Fim",
-                           "Sprint(s) Afetado(s)","Horas Indisponíveis"] if c in aus.columns]
-    if "Tipo" in aus.columns:
-        styled_a = aus[show_a].style.map(color_tipo, subset=["Tipo"])
-        st.dataframe(styled_a, use_container_width=True, hide_index=True)
-    else:
-        st.dataframe(aus[show_a], use_container_width=True, hide_index=True)
-
-    # Impacto por sprint
-    st.markdown('<div class="section-title">Impacto por Sprint</div>', unsafe_allow_html=True)
-    if "Sprint(s) Afetado(s)" in aus.columns and "Horas Indisponíveis" in aus.columns:
-        sp_imp = aus.groupby("Sprint(s) Afetado(s)")["Horas Indisponíveis"].sum().reset_index()
-        fig_a = px.bar(sp_imp, x="Sprint(s) Afetado(s)", y="Horas Indisponíveis",
-                       color_discrete_sequence=["#E05A2B"],
-                       labels={"Sprint(s) Afetado(s)":"Sprint","Horas Indisponíveis":"Horas Indisponíveis"})
-        fig_a.update_layout(height=280, plot_bgcolor="white",
-                            paper_bgcolor="rgba(0,0,0,0)", margin=dict(t=10,b=10))
-        st.plotly_chart(fig_a, use_container_width=True)
-
-    # Por tipo
-    st.markdown('<div class="section-title">Distribuição por Tipo</div>', unsafe_allow_html=True)
-    if "Tipo" in aus.columns and not aus.empty:
-        tp_cnt = aus["Tipo"].value_counts().reset_index()
-        tp_cnt.columns = ["Tipo","Count"]
-        fig_t = px.pie(tp_cnt, values="Count", names="Tipo", hole=0.45,
-                       color="Tipo",
-                       color_discrete_map={"Férias":"#BBDEFB","Folga":"#FFF9C4","Licença":"#FFCDD2"})
-        fig_t.update_layout(height=260, margin=dict(t=10,b=10,l=10,r=80))
-        st.plotly_chart(fig_t, use_container_width=True)
 
 # ════════════════════════════════════════════════════════════════
 # 📅 FÉRIAS E AUSÊNCIAS (nova versão Kanban)
