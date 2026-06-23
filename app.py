@@ -50,8 +50,9 @@ STATUS_COLORS = {
     "Despriorizado":"#D5D8DC",
 }
 
-# ── GitHub ───────────────────────────────────────────────────────
-GITHUB_URL = "https://raw.githubusercontent.com/allan-ribeiro-zup/zup-capacity-dashboard/main/template_capacity_zup.xlsx"
+# ── URLs GitHub ───────────────────────────────────────────────────
+GITHUB_URL        = "https://raw.githubusercontent.com/allan-ribeiro-zup/zup-capacity-dashboard/main/template_capacity_zup.xlsx"
+GITHUB_DEPLOY_URL = "https://raw.githubusercontent.com/allan-ribeiro-zup/zup-capacity-dashboard/main/template_deploy_zup.xlsx"
 
 # ── Sidebar ───────────────────────────────────────────────────────
 with st.sidebar:
@@ -68,6 +69,7 @@ with st.sidebar:
         "👥 Planejamento das Squads",
         "📅 Férias e Ausências",
         "👤 Gestão de Pessoas",
+        "🚀 Acompanhamento de Deploy",
     ])
     st.markdown("---")
     st.caption("Zup · Gestão de Capacidade · 2026")
@@ -85,7 +87,8 @@ def safe_pct(df, col, val):
         return 0
     return len(df[df[col] == val])
 
-@st.cache_data(show_spinner="Carregando dados do Google Drive...", ttl=300)
+# ── Carregamento: capacidade ──────────────────────────────────────
+@st.cache_data(show_spinner="Carregando dados do GitHub...", ttl=300)
 def load():
     try:
         resp = requests.get(GITHUB_URL, timeout=30)
@@ -111,11 +114,9 @@ def load():
             df = xls.parse(nm, header=2)
             df.columns = [str(c).strip() for c in df.columns]
             df = df.dropna(how="all")
-            # Remove linha de subcabeçalho (Início/Fim/Dias)
             if "Zupper" in df.columns:
                 df = df[df["Zupper"].notna() & (df["Zupper"] != "Zupper")]
             return df
-
         return {
             "membros":    get("Membros"),
             "ausencias":  get_ferias(),
@@ -126,6 +127,26 @@ def load():
         }
     except Exception as e:
         return {"ok": False, "erro": str(e)}
+
+# ── Carregamento: deploy ──────────────────────────────────────────
+@st.cache_data(show_spinner="Carregando dados de deploy...", ttl=300)
+def load_deploy():
+    try:
+        resp = requests.get(GITHUB_DEPLOY_URL, timeout=30)
+        resp.raise_for_status()
+        xls  = pd.ExcelFile(io.BytesIO(resp.content), engine="openpyxl")
+        abas = [s for s in xls.sheet_names if s.isdigit() and len(s) == 8]
+        abas_sorted = sorted(abas, reverse=True)
+        sheets = {}
+        for aba in abas_sorted:
+            df = xls.parse(aba, header=2)
+            df.columns = [str(c).strip() for c in df.columns]
+            df = df.dropna(how="all")
+            df = df[df["BUG"].notna() & (df["BUG"].astype(str).str.strip() != "")]
+            sheets[aba] = df
+        return {"ok": True, "sheets": sheets, "abas": abas_sorted}
+    except Exception as e:
+        return {"ok": False, "erro": str(e), "sheets": {}, "abas": []}
 
 # ── Carrega dados ─────────────────────────────────────────────────
 with st.spinner("Carregando dados do GitHub..."):
@@ -142,14 +163,15 @@ cap       = data["cap"]
 membros   = data["membros"]
 ausencias = data["ausencias"]
 
+
+# ════════════════════════════════════════════════════════════════
 # 🏠 DASHBOARD
 # ════════════════════════════════════════════════════════════════
 if pagina == "🏠 Dashboard":
     st.markdown("# Dashboard de Capacidade · Gestão de Portfólio")
 
-    # Filtros
-    squads_all = sorted(roadmap["Squad"].dropna().unique().tolist()) if "Squad" in roadmap.columns else []
-    releases_all = sorted(ativ["Release"].dropna().unique().tolist()) if "Release" in ativ.columns else []
+    squads_all   = sorted(roadmap["Squad"].dropna().unique().tolist()) if "Squad" in roadmap.columns else []
+    releases_all = sorted(ativ["Release"].dropna().unique().tolist())  if "Release" in ativ.columns else []
 
     cf1, cf2 = st.columns([3,1])
     with cf1:
@@ -161,7 +183,6 @@ if pagina == "🏠 Dashboard":
     if squad_sel and "Squad" in rm.columns:
         rm = rm[rm["Squad"].isin(squad_sel)]
 
-    # KPIs
     total   = len(rm)
     andando = safe_pct(rm, "Status", "Em Andamento")
     concl   = safe_pct(rm, "Status", "Concluído")
@@ -180,7 +201,6 @@ if pagina == "🏠 Dashboard":
     st.markdown("---")
     col_a, col_b = st.columns(2)
 
-    # Donut status
     with col_a:
         st.markdown('<div class="section-title">Distribuição por Status</div>', unsafe_allow_html=True)
         if "Status" in rm.columns and not rm.empty:
@@ -194,7 +214,6 @@ if pagina == "🏠 Dashboard":
         else:
             st.info("Sem dados de status no roadmap.")
 
-    # Horas por Squad (barras)
     with col_b:
         st.markdown('<div class="section-title">Horas Disponíveis por Squad</div>', unsafe_allow_html=True)
         if not cap.empty and "Squad" in cap.columns:
@@ -212,7 +231,6 @@ if pagina == "🏠 Dashboard":
         else:
             st.info("Sem dados de capacidade.")
 
-    # Capacidade por Sprint (linha + barra)
     st.markdown('<div class="section-title">Capacidade Total por Sprint</div>', unsafe_allow_html=True)
     if not cap.empty:
         sp_cols = [c for c in SPRINTS if c in cap.columns]
@@ -227,7 +245,6 @@ if pagina == "🏠 Dashboard":
                                 yaxis_title="Horas")
             st.plotly_chart(fig3, use_container_width=True)
 
-    # Heatmap plataforma × sprint
     st.markdown('<div class="section-title">Utilização por Plataforma × Sprint</div>', unsafe_allow_html=True)
     if not cap.empty and "Plataforma" in cap.columns:
         sp_cols = [c for c in SPRINTS if c in cap.columns]
@@ -251,11 +268,10 @@ elif pagina == "🗺️ Roadmap Detalhado":
     if roadmap.empty:
         st.warning("Sem dados na aba 'Roadmap' do Excel."); st.stop()
 
-    # Filtros
     f1,f2,f3,f4 = st.columns(4)
-    squads_r   = sorted(roadmap["Squad"].dropna().unique())    if "Squad"      in roadmap.columns else []
-    status_r   = sorted(roadmap["Status"].dropna().unique())   if "Status"     in roadmap.columns else []
-    plats_r    = sorted(roadmap["Plataforma"].dropna().unique()) if "Plataforma" in roadmap.columns else []
+    squads_r = sorted(roadmap["Squad"].dropna().unique())     if "Squad"      in roadmap.columns else []
+    status_r = sorted(roadmap["Status"].dropna().unique())    if "Status"     in roadmap.columns else []
+    plats_r  = sorted(roadmap["Plataforma"].dropna().unique()) if "Plataforma" in roadmap.columns else []
 
     with f1: sq  = st.multiselect("Squad",      squads_r)
     with f2: st_ = st.multiselect("Status",     status_r)
@@ -268,7 +284,6 @@ elif pagina == "🗺️ Roadmap Detalhado":
     if pl  and "Plataforma" in rm2.columns: rm2 = rm2[rm2["Plataforma"].isin(pl)]
     if bsc and "Tarefa"     in rm2.columns: rm2 = rm2[rm2["Tarefa"].str.contains(bsc, case=False, na=False)]
 
-    # KPIs filtrados
     k1,k2,k3,k4,k5 = st.columns(5)
     k1.markdown(card("Total", len(rm2), "orange"), unsafe_allow_html=True)
     k2.markdown(card("Em Andamento", safe_pct(rm2,"Status","Em Andamento")), unsafe_allow_html=True)
@@ -293,7 +308,6 @@ elif pagina == "🗺️ Roadmap Detalhado":
     styled = rm2[show_cols].style.map(color_st, subset=["Status"] if "Status" in show_cols else [])
     st.dataframe(styled, use_container_width=True, height=500)
 
-    # Mini charts
     st.markdown("---")
     ca, cb = st.columns(2)
     with ca:
@@ -343,7 +357,6 @@ elif pagina == "📊 Atividades por Release":
 
     sp_cols = [c for c in SPRINTS if c in df_rel.columns]
 
-    # Heatmap de % por sprint
     st.markdown('<div class="section-title">Progresso % por Iniciativa × Sprint</div>', unsafe_allow_html=True)
     if sp_cols and "Grande Iniciativa" in df_rel.columns and not df_rel.empty:
         pivot = df_rel.set_index("Grande Iniciativa")[sp_cols].apply(pd.to_numeric, errors="coerce")
@@ -357,17 +370,14 @@ elif pagina == "📊 Atividades por Release":
                             coloraxis_showscale=False)
         st.plotly_chart(fig_h, use_container_width=True)
 
-    # Barras de progresso por iniciativa
     st.markdown('<div class="section-title">Status por Iniciativa</div>', unsafe_allow_html=True)
     if "Grande Iniciativa" in df_rel.columns and "Status" in df_rel.columns:
         for _, row in df_rel.iterrows():
             ini    = row.get("Grande Iniciativa","—")
             status = row.get("Status","Não Iniciado")
             squad  = row.get("Squad","")
-            # calcula % médio das sprints com valor
             vals = [row.get(s) for s in sp_cols if pd.notna(row.get(s)) and isinstance(row.get(s),(int,float))]
             pct  = max(vals) if vals else 0
-            cor  = STATUS_COLORS.get(status,"#BDC3C7")
             col_i, col_p = st.columns([4,6])
             with col_i:
                 st.markdown(f"**{ini}** <span style='font-size:11px;color:#888'>· {squad}</span>", unsafe_allow_html=True)
@@ -375,7 +385,6 @@ elif pagina == "📊 Atividades por Release":
             with col_p:
                 st.progress(int(pct)/100, text=f"{int(pct)}%")
 
-    # Tabela
     with st.expander("📋 Ver tabela completa"):
         st.dataframe(df_rel, use_container_width=True, hide_index=True)
 
@@ -395,14 +404,13 @@ elif pagina == "👥 Planejamento das Squads":
     sq_sel   = st.multiselect("Filtrar Squad", squads_c, default=squads_c)
     cap_f    = cap[cap["Squad"].isin(sq_sel)] if sq_sel and "Squad" in cap.columns else cap
 
-    # KPIs plataforma
     plats = sorted(cap_f["Plataforma"].dropna().unique()) if "Plataforma" in cap_f.columns else []
     if plats:
         cols_k = st.columns(len(plats))
         for idx, plat in enumerate(plats):
-            df_p   = cap_f[cap_f["Plataforma"]==plat]
-            total  = df_p[sp_cols].sum().sum() if sp_cols else 0
-            n_mem  = len(membros[membros["Plataforma"]==plat]) if not membros.empty and "Plataforma" in membros.columns else "—"
+            df_p  = cap_f[cap_f["Plataforma"]==plat]
+            total = df_p[sp_cols].sum().sum() if sp_cols else 0
+            n_mem = len(membros[membros["Plataforma"]==plat]) if not membros.empty and "Plataforma" in membros.columns else "—"
             with cols_k[idx]:
                 st.markdown(f"""<div class="metric-card">
                     <div class="metric-label">{plat}</div>
@@ -412,7 +420,6 @@ elif pagina == "👥 Planejamento das Squads":
 
     st.markdown("---")
 
-    # Gráfico capacidade por sprint e plataforma
     st.markdown('<div class="section-title">Capacidade por Sprint e Plataforma</div>', unsafe_allow_html=True)
     if sp_cols and "Plataforma" in cap_f.columns:
         grp  = cap_f.groupby("Plataforma")[sp_cols].sum().reset_index()
@@ -424,7 +431,6 @@ elif pagina == "👥 Planejamento das Squads":
                             paper_bgcolor="rgba(0,0,0,0)", margin=dict(t=10,b=10))
         st.plotly_chart(fig_b, use_container_width=True)
 
-    # Heatmap %
     st.markdown('<div class="section-title">Heatmap de Horas por Plataforma × Sprint</div>', unsafe_allow_html=True)
     if sp_cols and "Plataforma" in cap_f.columns:
         pvt = cap_f.groupby("Plataforma")[sp_cols].sum()
@@ -435,7 +441,6 @@ elif pagina == "👥 Planejamento das Squads":
         fig_hm.update_layout(height=230, margin=dict(t=5,b=5), coloraxis_showscale=False)
         st.plotly_chart(fig_hm, use_container_width=True)
 
-    # Membros por squad
     st.markdown('<div class="section-title">Membros por Squad</div>', unsafe_allow_html=True)
     if not membros.empty and "Squad" in membros.columns:
         for sq in (sq_sel if sq_sel else squads_c):
@@ -449,10 +454,8 @@ elif pagina == "👥 Planejamento das Squads":
         st.info("Preencha a aba 'Membros' no Excel para ver os detalhes do time.")
 
 
-
-
 # ════════════════════════════════════════════════════════════════
-# 📅 FÉRIAS E AUSÊNCIAS (nova versão Kanban)
+# 📅 FÉRIAS E AUSÊNCIAS
 # ════════════════════════════════════════════════════════════════
 elif pagina == "📅 Férias e Ausências":
     st.markdown("# Férias e Ausências 2026")
@@ -464,20 +467,9 @@ elif pagina == "📅 Férias e Ausências":
     MESES_NOMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
                    "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
 
-    # Detecta colunas de dias por mês (coluna "Dias" de cada mês)
-    dias_cols = {}
-    for i, mes in enumerate(MESES_NOMES):
-        # Procura colunas que sejam Dias de cada mês
-        for col in aus.columns:
-            if str(col).strip() == "Dias" or str(col).strip() == f"Dias.{i}":
-                pass
-    # Abordagem: lê colunas pelo índice (posição fixa)
-    # Fixas: 0=Zupper,1=Projeto,2=Perfil,3=DayOff1,4=DayOff2,5=Aniv
-    # Depois: triplas Início/Fim/Dias por mês, última = Total
-    cols = list(aus.columns)
+    cols      = list(aus.columns)
     total_col = cols[-1]
-    
-    # Filtros
+
     projetos_disp = sorted(aus["Projeto"].dropna().replace("",float("nan")).dropna().unique()) if "Projeto" in aus.columns else []
     perfis_disp   = sorted(aus["Perfil"].dropna().unique()) if "Perfil" in aus.columns else []
 
@@ -494,16 +486,14 @@ elif pagina == "📅 Férias e Ausências":
     if perf_f and "Perfil" in aus_f.columns:
         aus_f = aus_f[aus_f["Perfil"].isin(perf_f)]
 
-    # KPIs
-    total_zuppers  = len(aus_f)
-    sem_projeto    = len(aus_f[aus_f["Projeto"].fillna("").str.strip() == ""]) if "Projeto" in aus_f.columns else 0
-    
-    # Extrai dias do mês selecionado
+    total_zuppers = len(aus_f)
+    sem_projeto   = len(aus_f[aus_f["Projeto"].fillna("").str.strip() == ""]) if "Projeto" in aus_f.columns else 0
+
     col_dias_mes = None
-    offset = 6 + mes_idx * 3 + 2  # posição da coluna Dias do mês
+    offset = 6 + mes_idx * 3 + 2
     if offset < len(cols):
         col_dias_mes = cols[offset]
-    
+
     ausentes_mes = 0
     if col_dias_mes:
         ausentes_mes = len(aus_f[pd.to_numeric(aus_f[col_dias_mes], errors="coerce").fillna(0) > 0])
@@ -518,7 +508,6 @@ elif pagina == "📅 Férias e Ausências":
 
     st.markdown("---")
 
-    # Gráfico de barras: ausências por mês
     st.markdown('<div class="section-title">Ausências por Mês</div>', unsafe_allow_html=True)
     dados_meses = []
     for i, mes in enumerate(MESES_NOMES):
@@ -550,7 +539,6 @@ elif pagina == "📅 Férias e Ausências":
         )
         st.plotly_chart(fig_m, use_container_width=True)
 
-    # Heatmap Zupper × Mês
     st.markdown('<div class="section-title">Disponibilidade por Zupper × Mês</div>', unsafe_allow_html=True)
     if "Zupper" in aus_f.columns:
         heat_data = []
@@ -578,9 +566,9 @@ elif pagina == "📅 Férias e Ausências":
             )
             st.plotly_chart(fig_h, use_container_width=True)
 
-    # Gantt anual
     st.markdown('<div class="section-title">Calendário Anual de Férias (Gantt)</div>', unsafe_allow_html=True)
     if "Zupper" in aus_f.columns:
+        import datetime
         gantt_data = []
         for _, row in aus_f.iterrows():
             zupper  = str(row.get("Zupper",""))
@@ -595,12 +583,11 @@ elif pagina == "📅 Férias e Ausências":
                     dias_v = pd.to_numeric(row.get(cols[off_dias], 0), errors="coerce")
                     if pd.notna(dias_v) and dias_v > 0 and ini_v and str(ini_v).strip():
                         try:
-                            ano = 2026
+                            ano     = 2026
                             ini_str = f"{str(ini_v).strip()}/{ano}"
                             fim_str = f"{str(fim_v).strip()}/{ano}" if fim_v and str(fim_v).strip() else ini_str
-                            import datetime
-                            ini_dt = datetime.datetime.strptime(ini_str, "%d/%m/%Y")
-                            fim_dt = datetime.datetime.strptime(fim_str, "%d/%m/%Y")
+                            ini_dt  = datetime.datetime.strptime(ini_str, "%d/%m/%Y")
+                            fim_dt  = datetime.datetime.strptime(fim_str, "%d/%m/%Y")
                             gantt_data.append({
                                 "Zupper":  zupper,
                                 "Projeto": projeto,
@@ -624,16 +611,12 @@ elif pagina == "📅 Férias e Ausências":
                 height=max(300, len(aus_f)*32),
                 plot_bgcolor="white", paper_bgcolor="rgba(0,0,0,0)",
                 margin=dict(t=10,b=10),
-                xaxis=dict(
-                    range=["2026-01-01","2026-12-31"],
-                    dtick="M1", tickformat="%b"
-                )
+                xaxis=dict(range=["2026-01-01","2026-12-31"], dtick="M1", tickformat="%b")
             )
             st.plotly_chart(fig_g, use_container_width=True)
         else:
             st.info("Preencha as datas de início e fim na planilha para visualizar o Gantt.")
 
-    # Tabela completa
     with st.expander("📋 Ver tabela completa"):
         show_cols = [c for c in ["Zupper","Projeto","Perfil","Day Off 1","Day Off 2","Aniversário", total_col] if c in aus_f.columns]
         st.dataframe(aus_f[show_cols], use_container_width=True, hide_index=True)
@@ -656,7 +639,6 @@ elif pagina == "👤 Gestão de Pessoas":
 
     st.markdown("---")
 
-    # ── Disponíveis para realocação ──────────────────────────────
     st.markdown('<div class="section-title">⚠️ Zuppers Disponíveis para Realocação</div>', unsafe_allow_html=True)
     if "Projeto" in aus.columns:
         aus["Projeto"] = aus["Projeto"].fillna("")
@@ -672,18 +654,16 @@ elif pagina == "👤 Gestão de Pessoas":
 
     st.markdown("---")
 
-    # ── Headcount por projeto ─────────────────────────────────────
     col_a, col_b = st.columns(2)
     with col_a:
         st.markdown('<div class="section-title">Headcount por Projeto</div>', unsafe_allow_html=True)
         if "Projeto" in aus.columns:
             aus["Projeto"] = aus["Projeto"].fillna("")
-            hc = aus[aus["Projeto"].astype(str).str.strip() != ""]
+            hc     = aus[aus["Projeto"].astype(str).str.strip() != ""]
             hc_cnt = hc["Projeto"].value_counts().reset_index()
             hc_cnt.columns = ["Projeto","Pessoas"]
             fig_hc = px.bar(hc_cnt, x="Pessoas", y="Projeto", orientation="h",
-                            color_discrete_sequence=["#2C1A1A"],
-                            text="Pessoas")
+                            color_discrete_sequence=["#2C1A1A"], text="Pessoas")
             fig_hc.update_traces(textposition="outside")
             fig_hc.update_layout(height=320, plot_bgcolor="white",
                                  paper_bgcolor="rgba(0,0,0,0)",
@@ -700,7 +680,6 @@ elif pagina == "👤 Gestão de Pessoas":
             fig_p.update_layout(height=320, margin=dict(t=10,b=10,l=10,r=80))
             st.plotly_chart(fig_p, use_container_width=True)
 
-    # ── Perfis por projeto ─────────────────────────────────────────
     st.markdown('<div class="section-title">Perfis por Projeto</div>', unsafe_allow_html=True)
     if "Projeto" in aus.columns and "Perfil" in aus.columns:
         proj_perf = aus[aus["Projeto"].astype(str).str.strip() != ""].groupby(
@@ -710,22 +689,20 @@ elif pagina == "👤 Gestão de Pessoas":
                         color_discrete_sequence=px.colors.qualitative.Set2)
         fig_pp.update_traces(textposition="inside")
         fig_pp.update_layout(height=340, plot_bgcolor="white",
-                             paper_bgcolor="rgba(0,0,0,0)",
-                             margin=dict(t=10,b=10))
+                             paper_bgcolor="rgba(0,0,0,0)", margin=dict(t=10,b=10))
         st.plotly_chart(fig_pp, use_container_width=True)
 
-    # ── Concentração de ausências ─────────────────────────────────
     st.markdown('<div class="section-title">Concentração de Ausências por Mês</div>', unsafe_allow_html=True)
     dados_conc = []
     for i, mes in enumerate(MESES_NOMES):
         offset_d = 6 + i * 3 + 2
         if offset_d < len(cols):
-            col_d = cols[offset_d]
+            col_d   = cols[offset_d]
             por_proj = aus[aus["Projeto"].fillna("").str.strip() != ""].copy()
             por_proj["dias_num"] = pd.to_numeric(por_proj[col_d], errors="coerce").fillna(0)
-            n_aus = len(por_proj[por_proj["dias_num"] > 0])
+            n_aus   = len(por_proj[por_proj["dias_num"] > 0])
             total_p = len(por_proj)
-            pct = round(n_aus / total_p * 100, 1) if total_p > 0 else 0
+            pct     = round(n_aus / total_p * 100, 1) if total_p > 0 else 0
             dados_conc.append({"Mês": mes, "% Ausentes": pct, "Pessoas": n_aus})
 
     df_conc = pd.DataFrame(dados_conc)
@@ -734,8 +711,7 @@ elif pagina == "👤 Gestão de Pessoas":
                        color="% Ausentes",
                        color_continuous_scale=["#27AE60","#F1C40F","#E74C3C"],
                        text="% Ausentes")
-        fig_c.add_hline(y=20, line_dash="dash", line_color="#E74C3C",
-                        annotation_text="Alerta 20%")
+        fig_c.add_hline(y=20, line_dash="dash", line_color="#E74C3C", annotation_text="Alerta 20%")
         fig_c.update_traces(texttemplate="%{text}%", textposition="outside")
         fig_c.update_layout(height=320, plot_bgcolor="white",
                             paper_bgcolor="rgba(0,0,0,0)",
@@ -743,7 +719,6 @@ elif pagina == "👤 Gestão de Pessoas":
                             yaxis_title="% do time ausente")
         st.plotly_chart(fig_c, use_container_width=True)
 
-    # ── Ranking saldo de férias ───────────────────────────────────
     st.markdown('<div class="section-title">Ranking — Dias de Férias Agendados por Zupper</div>', unsafe_allow_html=True)
     if "Zupper" in aus.columns and total_col in aus.columns:
         rank = aus[["Zupper","Projeto","Perfil", total_col]].copy()
@@ -757,13 +732,10 @@ elif pagina == "👤 Gestão de Pessoas":
                        labels={total_col: "Dias Agendados"})
         fig_r.update_traces(textposition="outside")
         fig_r.update_layout(height=max(300, len(rank)*28),
-                            plot_bgcolor="white",
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            margin=dict(t=10,b=10,r=40),
-                            coloraxis_showscale=False)
+                            plot_bgcolor="white", paper_bgcolor="rgba(0,0,0,0)",
+                            margin=dict(t=10,b=10,r=40), coloraxis_showscale=False)
         st.plotly_chart(fig_r, use_container_width=True)
 
-    # ── Sobreposição de ausências por projeto ─────────────────────
     st.markdown('<div class="section-title">⚠️ Sobreposição de Ausências por Projeto</div>', unsafe_allow_html=True)
     alertas = []
     if "Projeto" in aus.columns:
@@ -771,11 +743,11 @@ elif pagina == "👤 Gestão de Pessoas":
             offset_d = 6 + i * 3 + 2
             if offset_d < len(cols):
                 col_d = cols[offset_d]
-                grp = aus[aus["Projeto"].astype(str).str.strip() != ""].copy()
+                grp   = aus[aus["Projeto"].astype(str).str.strip() != ""].copy()
                 grp["dias_num"] = pd.to_numeric(grp[col_d], errors="coerce").fillna(0)
                 ausentes = grp[grp["dias_num"] > 0].groupby("Projeto")["Zupper"].apply(list).reset_index()
                 ausentes.columns = ["Projeto","Ausentes"]
-                ausentes["Qtd"] = ausentes["Ausentes"].apply(len)
+                ausentes["Qtd"]  = ausentes["Ausentes"].apply(len)
                 criticos = ausentes[ausentes["Qtd"] >= 2]
                 for _, row in criticos.iterrows():
                     alertas.append({
@@ -795,3 +767,193 @@ elif pagina == "👤 Gestão de Pessoas":
             st.dataframe(styled_alert, use_container_width=True, hide_index=True)
         else:
             st.success("Nenhuma sobreposição crítica de ausências encontrada.")
+
+
+# ════════════════════════════════════════════════════════════════
+# 🚀 ACOMPANHAMENTO DE DEPLOY
+# ════════════════════════════════════════════════════════════════
+elif pagina == "🚀 Acompanhamento de Deploy":
+    st.markdown("# Acompanhamento de Deploy")
+
+    deploy_data = load_deploy()
+
+    if not deploy_data["ok"] or not deploy_data["abas"]:
+        st.error(f"❌ Erro ao carregar planilha de deploy: {deploy_data.get('erro', 'Arquivo não encontrado')}")
+        st.info("Verifique se o arquivo 'template_deploy_zup.xlsx' está no repositório GitHub.")
+        st.stop()
+
+    abas = deploy_data["abas"]
+
+    def fmt_aba(a):
+        return f"{a[:2]}/{a[2:4]}/{a[4:]}  {'⬅ atual' if a == abas[0] else ''}"
+
+    ciclo_sel = st.selectbox("Ciclo de deploy", abas, format_func=fmt_aba, index=0)
+    df = deploy_data["sheets"][ciclo_sel].copy()
+
+    # Inferir status
+    def tem(val):
+        return bool(str(val).strip()) and str(val).strip().lower() not in ["nan","none",""]
+
+    def inferir_status(row):
+        pr    = str(row.get("PR",    "")).strip()
+        merge = str(row.get("MERGE", "")).strip()
+        tag   = str(row.get("TAG",   "")).strip()
+        if pr and merge and tag:
+            return "Concluído"
+        elif pr and merge:
+            return "Aguardando TAG"
+        elif pr:
+            return "Aguardando Merge"
+        else:
+            return "Pendente"
+
+    df["__status"]       = df.apply(inferir_status, axis=1)
+    df["__tem_pr"]       = df["PR"].apply(tem)
+    df["__tem_merge"]    = df["MERGE"].apply(tem)
+    df["__tem_tag"]      = df["TAG"].apply(tem)
+    df["__tem_rollback"] = df["Plano de Rollback"].apply(tem)
+    df["__tem_config"]   = df["Configurações"].apply(tem)
+    df["__tem_artefato"] = df["Artefatos"].apply(tem)
+
+    total        = len(df)
+    concluidos   = len(df[df["__status"] == "Concluído"])
+    ag_merge     = len(df[df["__status"] == "Aguardando Merge"])
+    ag_tag       = len(df[df["__status"] == "Aguardando TAG"])
+    pendentes    = len(df[df["__status"] == "Pendente"])
+    prontos      = len(df[df["__tem_pr"] & df["__tem_merge"] & df["__tem_tag"] & df["__tem_rollback"]])
+
+    # KPIs
+    k1,k2,k3,k4,k5,k6 = st.columns(6)
+    k1.markdown(card("Total de Bugs",     total),               unsafe_allow_html=True)
+    k2.markdown(card("Concluídos",        concluidos, "green"), unsafe_allow_html=True)
+    k3.markdown(card("Ag. Merge",         ag_merge,   "orange"),unsafe_allow_html=True)
+    k4.markdown(card("Ag. TAG",           ag_tag,     "orange"),unsafe_allow_html=True)
+    k5.markdown(card("Pendentes",         pendentes,  "red"),   unsafe_allow_html=True)
+    k6.markdown(card("Prontos p/ Deploy", prontos,    "blue"),  unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    col_check, col_resp = st.columns([1,1])
+
+    with col_check:
+        st.markdown('<div class="section-title">Checklist de prontidão</div>', unsafe_allow_html=True)
+
+        def check_line(label, qtd, total_bugs):
+            pct  = qtd / total_bugs * 100 if total_bugs > 0 else 0
+            cor  = "#27AE60" if pct == 100 else "#F1C40F" if pct >= 50 else "#E74C3C"
+            icone = "✅" if pct == 100 else "⚠️" if pct >= 50 else "❌"
+            st.markdown(
+                f"""<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                    <span style="font-size:16px">{icone}</span>
+                    <span style="flex:1;font-size:13px">{label}</span>
+                    <span style="font-size:13px;font-weight:500;color:{cor}">{qtd}/{total_bugs}</span>
+                </div>""",
+                unsafe_allow_html=True
+            )
+            st.progress(int(pct) / 100)
+
+        check_line("PR aberto",         df["__tem_pr"].sum(),       total)
+        check_line("Merge realizado",   df["__tem_merge"].sum(),    total)
+        check_line("TAG gerada",        df["__tem_tag"].sum(),      total)
+        check_line("Plano de Rollback", df["__tem_rollback"].sum(), total)
+        check_line("Configurações",     df["__tem_config"].sum(),   total)
+        check_line("Artefatos",         df["__tem_artefato"].sum(), total)
+
+    with col_resp:
+        st.markdown('<div class="section-title">Bugs por responsável</div>', unsafe_allow_html=True)
+        if "RESPONSÁVEL" in df.columns:
+            resp_cnt = df["RESPONSÁVEL"].value_counts().reset_index()
+            resp_cnt.columns = ["Responsável","Qtd"]
+            fig_resp = px.bar(resp_cnt, x="Qtd", y="Responsável", orientation="h",
+                              color_discrete_sequence=["#E05A2B"], text="Qtd")
+            fig_resp.update_traces(textposition="outside")
+            fig_resp.update_layout(height=280, plot_bgcolor="white",
+                                   paper_bgcolor="rgba(0,0,0,0)",
+                                   margin=dict(t=10,b=10,l=10,r=40),
+                                   xaxis_title="", yaxis_title="")
+            st.plotly_chart(fig_resp, use_container_width=True)
+
+    st.markdown("---")
+
+    # Tabela de bugs
+    st.markdown('<div class="section-title">Bugs do ciclo</div>', unsafe_allow_html=True)
+
+    status_cores = {
+        "Concluído":       "#C8E6C9",
+        "Aguardando TAG":  "#FFF9C4",
+        "Aguardando Merge":"#FFE0B2",
+        "Pendente":        "#FFCDD2",
+    }
+
+    show_cols = [c for c in ["RESPONSÁVEL","BUG","Descrição","__status",
+                              "PR","MERGE","TAG","Plano de Rollback",
+                              "Configurações","Artefatos"] if c in df.columns]
+
+    df_show = df[show_cols].rename(columns={"__status": "Status"})
+
+    def color_status(val):
+        return f"background-color:{status_cores.get(val,'')}"
+
+    styled = df_show.style.map(color_status, subset=["Status"])
+    st.dataframe(styled, use_container_width=True, height=420, hide_index=True)
+
+    st.markdown("---")
+
+    # Alertas automáticos
+    st.markdown('<div class="section-title">Alertas automáticos</div>', unsafe_allow_html=True)
+
+    sem_rb_lista  = df[~df["__tem_rollback"]]["BUG"].tolist()
+    sem_tag_lista = df[df["__tem_merge"] & ~df["__tem_tag"]]["BUG"].tolist()
+    prontos_lista = df[df["__tem_pr"] & df["__tem_merge"] & df["__tem_tag"] & df["__tem_rollback"]]["BUG"].tolist()
+
+    al1, al2, al3 = st.columns(3)
+
+    with al1:
+        if sem_rb_lista:
+            st.error(f"**⛔ Sem plano de rollback ({len(sem_rb_lista)})**\n\n" +
+                     "\n".join(f"- {b}" for b in sem_rb_lista))
+        else:
+            st.success("✅ Todos com rollback documentado")
+
+    with al2:
+        if sem_tag_lista:
+            st.warning(f"**⚠️ Merge feito, TAG pendente ({len(sem_tag_lista)})**\n\n" +
+                       "\n".join(f"- {b}" for b in sem_tag_lista))
+        else:
+            st.success("✅ Todos com TAG gerada")
+
+    with al3:
+        if prontos_lista:
+            st.info(f"**🚀 Prontos para deploy ({len(prontos_lista)})**\n\n" +
+                    "\n".join(f"- {b}" for b in prontos_lista))
+        else:
+            st.warning("Nenhum bug 100% pronto ainda")
+
+    # Histórico de ciclos
+    if len(abas) > 1:
+        st.markdown("---")
+        st.markdown('<div class="section-title">Histórico de ciclos</div>', unsafe_allow_html=True)
+
+        hist = []
+        for aba in abas:
+            d = deploy_data["sheets"][aba].copy()
+            if d.empty:
+                continue
+            d["__status"] = d.apply(inferir_status, axis=1)
+            hist.append({
+                "Ciclo":      f"{aba[:2]}/{aba[2:4]}/{aba[4:]}",
+                "Total":      len(d),
+                "Concluídos": len(d[d["__status"] == "Concluído"]),
+                "Pendentes":  len(d[d["__status"] == "Pendente"]),
+            })
+
+        df_hist = pd.DataFrame(hist)
+        fig_hist = px.bar(df_hist, x="Ciclo", y=["Concluídos","Pendentes"],
+                          barmode="group",
+                          color_discrete_sequence=["#27AE60","#E74C3C"],
+                          labels={"value":"Bugs","variable":""})
+        fig_hist.update_layout(height=280, plot_bgcolor="white",
+                               paper_bgcolor="rgba(0,0,0,0)",
+                               margin=dict(t=10,b=10),
+                               legend=dict(orientation="h", y=1.1))
+        st.plotly_chart(fig_hist, use_container_width=True)
