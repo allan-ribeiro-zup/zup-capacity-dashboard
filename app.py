@@ -36,6 +36,43 @@ st.markdown("""
       margin: 20px 0 10px;
   }
   .stDataFrame { border-radius: 8px; overflow: hidden; }
+
+  /* ── Estrutura das Squads ── */
+  .squad-wrap { font-family: sans-serif; }
+  .squad-dir {
+      display: inline-block; background: #E05A2B; color: #fff;
+      border-radius: 8px; padding: 6px 18px; font-size: 13px;
+      font-weight: 600; text-align: center; margin: 4px;
+  }
+  .squad-dir small { display: block; font-size: 10px; opacity: .8; font-weight: 400; }
+  .squad-coord {
+      display: inline-block; background: #2C1A1A; color: #fff;
+      border-radius: 6px; padding: 4px 14px; font-size: 12px;
+      font-weight: 500; text-align: center; margin: 3px;
+  }
+  .squad-coord small { display: block; font-size: 10px; opacity: .7; }
+  .squad-cap-block {
+      border: 1px solid #e0dcd8; border-radius: 10px;
+      padding: 10px 12px; background: #FAF8F6;
+      margin-bottom: 8px;
+  }
+  .squad-cap-title {
+      font-size: 12px; font-weight: 700; color: #2C1A1A;
+      border-bottom: 2px solid #E05A2B; padding-bottom: 4px;
+      margin-bottom: 8px;
+  }
+  .sq-pill {
+      display: inline-block; color: #fff; font-size: 10px;
+      font-weight: 600; padding: 2px 10px; border-radius: 4px;
+      margin-bottom: 4px;
+  }
+  .membro-tag {
+      display: inline-block; font-size: 10px; padding: 1px 7px;
+      border: 1px solid #ddd; border-radius: 4px;
+      background: #fff; color: #333; margin: 1px;
+  }
+  .membro-tag b { color: #888; font-weight: 400; }
+  .membro-tag.hl { background: #FEF9C3; border-color: #CA8A04; color: #713F12; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -50,7 +87,6 @@ STATUS_COLORS = {
     "Despriorizado":"#D5D8DC",
 }
 
-# ── URLs GitHub ───────────────────────────────────────────────────
 GITHUB_URL        = "https://raw.githubusercontent.com/allan-ribeiro-zup/zup-capacity-dashboard/main/template_capacity_zup.xlsx"
 GITHUB_DEPLOY_URL = "https://raw.githubusercontent.com/allan-ribeiro-zup/zup-capacity-dashboard/main/template_deploy_zup.xlsx"
 
@@ -70,6 +106,7 @@ with st.sidebar:
         "📅 Férias e Ausências",
         "👤 Gestão de Pessoas",
         "🚀 Acompanhamento de Deploy",
+        "🏢 Estrutura das Squads",
     ])
     st.markdown("---")
     st.caption("Zup · Gestão de Capacidade · 2026")
@@ -790,7 +827,6 @@ elif pagina == "🚀 Acompanhamento de Deploy":
     ciclo_sel = st.selectbox("Ciclo de deploy", abas, format_func=fmt_aba, index=0)
     df = deploy_data["sheets"][ciclo_sel].copy()
 
-    # Inferir status
     def tem(val):
         return bool(str(val).strip()) and str(val).strip().lower() not in ["nan","none",""]
 
@@ -822,7 +858,6 @@ elif pagina == "🚀 Acompanhamento de Deploy":
     pendentes    = len(df[df["__status"] == "Pendente"])
     prontos      = len(df[df["__tem_pr"] & df["__tem_merge"] & df["__tem_tag"] & df["__tem_rollback"]])
 
-    # KPIs
     k1,k2,k3,k4,k5,k6 = st.columns(6)
     k1.markdown(card("Total de Bugs",     total),               unsafe_allow_html=True)
     k2.markdown(card("Concluídos",        concluidos, "green"), unsafe_allow_html=True)
@@ -875,7 +910,6 @@ elif pagina == "🚀 Acompanhamento de Deploy":
 
     st.markdown("---")
 
-    # Tabela de bugs
     st.markdown('<div class="section-title">Bugs do ciclo</div>', unsafe_allow_html=True)
 
     status_cores = {
@@ -899,7 +933,6 @@ elif pagina == "🚀 Acompanhamento de Deploy":
 
     st.markdown("---")
 
-    # Alertas automáticos
     st.markdown('<div class="section-title">Alertas automáticos</div>', unsafe_allow_html=True)
 
     sem_rb_lista  = df[~df["__tem_rollback"]]["BUG"].tolist()
@@ -929,7 +962,6 @@ elif pagina == "🚀 Acompanhamento de Deploy":
         else:
             st.warning("Nenhum bug 100% pronto ainda")
 
-    # Histórico de ciclos
     if len(abas) > 1:
         st.markdown("---")
         st.markdown('<div class="section-title">Histórico de ciclos</div>', unsafe_allow_html=True)
@@ -957,3 +989,179 @@ elif pagina == "🚀 Acompanhamento de Deploy":
                                margin=dict(t=10,b=10),
                                legend=dict(orientation="h", y=1.1))
         st.plotly_chart(fig_hist, use_container_width=True)
+
+
+# ════════════════════════════════════════════════════════════════
+# 🏢 ESTRUTURA DAS SQUADS
+# ════════════════════════════════════════════════════════════════
+elif pagina == "🏢 Estrutura das Squads":
+    st.markdown("# Estrutura das Squads · Flex 2026")
+    st.caption("Visão completa da organização dos times por líder de capítulo e squad.")
+
+    # ── Dados da estrutura ────────────────────────────────────────
+    SQUADS = {
+        "carlos": {
+            "titulo": "Carlos (NP)",
+            "squads": {
+                "Salesforce": {
+                    "cor": "#0070D2",
+                    "membros": [
+                        ("Edson Vendramini","LT"),("Luis Sales","LT"),("Rafael Pasquim","LT"),
+                        ("Juliano Stercket","SM"),("William Carmo","PO"),("Marcleide Sousa","QA"),
+                        ("Leandro Moral","Dev"),("José Rodrigues","Dev"),("Henrique Tosta","Dev"),
+                        ("Nadia Lima","Dev"),("Danilo Silva","Dev"),("Fernando Assunção","LT"),
+                    ]
+                },
+            }
+        },
+        "victor": {
+            "titulo": "Victor (Banda Larga e Portal)",
+            "squads": {
+                "Silver":      {"cor":"#6B7280","membros":[("Tiago Carpanese","LT"),("Diogo Arantes","SM"),("Sônia Villanova","PO"),("Lucas Paglia Grisa","Back"),("Murilo Oliari Ribeiro","Back"),("Flavio de Paula Faria","Back"),("Ricardo Lima","Back"),("Danilo Valente dos Santos","Back"),("Herbert Luiz Soares","Back"),("Vivian Chiodo Dias","iOS"),("Edmundo Schultz Neto","And"),("Pedro Henrique Borges","iOS"),("Guilherme Jose","And"),("Maxwell de Sousa Martins","QA"),("Jéssica Euzébio Rocha","QA"),("Willian Moya","AT")]},
+                "Golden":      {"cor":"#B8860B","membros":[("Tiago Carpanese","TL"),("Larissa Trinchão","SM"),("Felipe Colem","PO"),("Filipe Alves Pinheiro","Back"),("Muriel Magno Teles","Back"),("Breno Silva","Back"),("Gerson Arbigaus","iOS"),("Erick Teixeira","iOS"),("Luan de Souza","iOS"),("Alexandre Mahmud","And"),("Juan Vicente","And"),("Bianca Bueno","QA"),("Victor Vital","QA"),("David Gomes","AT"),("Bruno Ferronato","Dev")]},
+                "Purple":      {"cor":"#6B21A8","membros":[("Vinicius Simone","SM"),("Alexandre Marques","PO"),("Fabio de Souza","Back"),("Paulo Gonçalves","Back"),("Carlos Silva","Back"),("Sylas Eckart","Web"),("Barbara Perina","QA"),("Silvana de Souza","QA"),("Marcelo Moreira","QA"),("Yuri Duarte Alves","QA"),("Willian Moya","Esp")]},
+                "Red":         {"cor":"#DC2626","membros":[("Vinicius Vense","LT"),("Allan Ribeiro","SM"),("Henrique Franzão","PO"),("Rodolfo Souza","Back"),("Jaqueline Moreno","Back"),("Vitor Lopes","Back"),("Luan Almeida","iOS"),("Italo Bianchini","iOS"),("Rui Barbosa","And"),("Raphael Silva","And"),("Kim","iOS")]},
+                "Yellow (BL)": {"cor":"#CA8A04","membros":[("Rafael Gomes","LT"),("Débora Ferreira","SM"),("PV Freitas","PO"),("Djair Soares Pereira","Back"),("Maria de Fatima","Back"),("João Henrique De Sá","Back"),("Lucas Terra","Back"),("Renan Veloso Silva","iOS"),("Raline Maria da Silva","iOS"),("Francisco Pereira","And"),("Wiliam Trancoso","And"),("Lucas Christopher","And"),("Brenda De Souza Garcia","QA"),("Diego Soares Santana","QA"),("Wagner","QA"),("Amabily de Oliveira","QA"),("George Tassiano","Web"),("Lucas Limoni","Web"),("Gabrielle Martins","Web"),("Michel Rodrigues","Web"),("Lucas Augusto Caetano","QA"),("Tiago Gomes","QA"),("Danielle de Brito","QA")]},
+                "Blue":        {"cor":"#1D4ED8","membros":[("Marcionei Bizerra","PO"),("Rejane da Silva","PO"),("Carol Masaki","SM"),("Gabriel Filipe","Back"),("Marcelo Littig","Back"),("Ronaldo Souza Cutrim","CSP"),("Roseane Costa","Back"),("Jeferson Fernandes","And"),("Pedro Henrique de Oliveira","iOS"),("Caroline Gomes","QA"),("Eduardo Rodrigues","QA"),("Marcus Lucena","LT"),("Aparicio Neto","Web"),("Dieison Silva","Web"),("Rosenilton Reis","Web"),("Wellyngton Matheus","Web")]},
+            }
+        },
+        "michele": {
+            "titulo": "Michele",
+            "squads": {
+                "White": {"cor":"#374151","membros":[("Hugo Celestino","LT"),("Monaliza Felipe","SM"),("Julio Ferreira Junior","PO"),("Vitoria Silva Cardoso","Back"),("Gabriel Severino","Back"),("Henio De Alcantara Junior","Back"),("Arthur Amestrete","Back"),("João Pedro Franco","iOS"),("Renan Maganha","iOS"),("Gabriel Hernandes","And"),("Mauricio de Souza Martins","And"),("Luiz Gustavo Fleria","QA"),("Felipe Falsetta","QA"),("Brenno Leite","QA"),("Carla Gomes","QA")]},
+                "Green": {"cor":"#15803D","membros":[("Thasso / Hugo","LT"),("Yago Taveiros Ferreira","LT"),("Rafael Lusivo","SM"),("Márcia Beatriz","PO"),("Anderson Barreiro","Back"),("Jefferson","Back"),("Beatriz Martins","Back"),("Pablo Henrique Castro","Back"),("Michel Peixoto","Back"),("Gerson","QA Back"),("Lucas Dittrich","QA Back"),("Matheus Fusco","iOS"),("Thais Conde","iOS"),("Matheus Santana","And"),("Ronnyery Barbosa","And"),("Letícia Vale","QA Front"),("Dreice Cousino","QA Front"),("Filipe Malta","QA Front"),("Daniel Ferreira","Back"),("Daniel Ramos","Back")]},
+            }
+        },
+        "joao": {
+            "titulo": "João Junior",
+            "squads": {
+                "Black": {"cor":"#111827","membros":[("Nayara Gaspar","LT"),("Lorena Melo","SM"),("Elizeu Rocha","PO"),("Eduardo Morgon","Back"),("Eduardo Rodrigues Delfino","Back"),("Felipe Ferreira Rezende","Back"),("Jefferson Santos Oliveira","Back"),("Raphaela Rosa","Back"),("Marcilio Zanatta","Back"),("José Vitor de A. Coelho","Back"),("Francisco Clewerton Pereira Roque","Back"),("Renato Filho","iOS"),("Fabio Franca","iOS"),("Joao Eudes","And"),("Augusto Favretto","And"),("Marcos Vinicius Macedo de Menezes","Web"),("Thiago Antonio Rodrigues","QA"),("Jonatas Micael Silva Peixoto","QA"),("Arthur Ayres","QA"),("Pablo Fleria","QA"),("Rhaniel Farias","DEV"),("Evelyn Sthefany","QA")]},
+            }
+        },
+        "raj": {
+            "titulo": "Raj",
+            "squads": {
+                "Orange / TA":  {"cor":"#EA580C","membros":[("Alysson Pereira","LT"),("Alexsandra Correa","QA"),("Victor Guerra","QA")]},
+                "Evoluções":    {"cor":"#0891B2","membros":[("Thasso Araujo","LT"),("Alexsandra Correa da Rosa","QA"),("Vinicius Freitas","Back NP"),("Nilton Mitsuharu Sugawara","Back"),("Gillian Mendes da Costa","Back"),("Luiz Henrique Bortolini","Back")]},
+                "Segurança":    {"cor":"#7C3AED","membros":[("Lucas Gontijo de Souza","Back Spec"),("Edigar Ferreira Junior","Back"),("Vaga aberta","Back Spec"),("Gillian Mendes da Costa","Back"),("Jessamine Silva Almeida Bueno","QA")]},
+            }
+        },
+    }
+
+    # ── Controles ─────────────────────────────────────────────────
+    col_v1, col_v2 = st.columns([3, 1])
+    with col_v1:
+        busca = st.text_input("🔍 Buscar membro", placeholder="Digite parte do nome...")
+    with col_v2:
+        visao = st.selectbox("Visão", ["Interativa (com filtros)", "Completa (todos os membros)"])
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        lider_sel = st.selectbox("Líder de capítulo", ["Todos"] + [v["titulo"] for v in SQUADS.values()])
+    with c2:
+        cargo_opts = ["Todos","LT","SM","PO","Back","iOS","And","QA","Web","Dev","AT"]
+        cargo_sel  = st.selectbox("Cargo / Perfil", cargo_opts)
+    with c3:
+        todos_squads = []
+        for cap_data in SQUADS.values():
+            todos_squads.extend(cap_data["squads"].keys())
+        squad_sel = st.selectbox("Squad", ["Todas"] + sorted(todos_squads))
+
+    st.markdown("---")
+
+    # ── KPIs dinâmicos ────────────────────────────────────────────
+    total_membros  = sum(len(sq["membros"]) for cap in SQUADS.values() for sq in cap["squads"].values())
+    total_squads   = sum(len(cap["squads"]) for cap in SQUADS.values())
+    total_lideres  = len(SQUADS)
+    total_lts      = sum(1 for cap in SQUADS.values() for sq in cap["squads"].values() for _,c in sq["membros"] if c == "LT")
+
+    mk1,mk2,mk3,mk4 = st.columns(4)
+    mk1.markdown(card("Total de membros", total_membros, "orange"), unsafe_allow_html=True)
+    mk2.markdown(card("Squads ativos",    total_squads,  "blue"),   unsafe_allow_html=True)
+    mk3.markdown(card("Líderes de capítulo", total_lideres),        unsafe_allow_html=True)
+    mk4.markdown(card("Líderes Técnicos (LT)", total_lts, "green"), unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ── Hierarquia topo ───────────────────────────────────────────
+    st.markdown("""
+    <div style="text-align:center;margin-bottom:8px">
+      <span class="squad-dir">Norberto Imamura<small>Delivery</small></span>
+      <span class="squad-dir">Rafael Moreira<small>Operações</small></span>
+    </div>
+    <div style="text-align:center;margin-bottom:4px">
+      <span class="squad-coord">Katia Santos</span>
+    </div>
+    <div style="text-align:center;margin-bottom:12px">
+      <span class="squad-coord">Heleno Araújo<small>Backend</small></span>
+      <span class="squad-coord">Pri Barone<small>Frontend</small></span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Renderiza capítulos ───────────────────────────────────────
+    busca_lower = busca.strip().lower()
+
+    for cap_key, cap_data in SQUADS.items():
+        # Filtro por líder
+        if lider_sel != "Todos" and cap_data["titulo"] != lider_sel:
+            continue
+
+        # Verifica se há algo para mostrar
+        squads_visiveis = {}
+        for sq_nome, sq_data in cap_data["squads"].items():
+            if squad_sel != "Todas" and sq_nome != squad_sel:
+                continue
+            membros_filtrados = []
+            for nome, cargo in sq_data["membros"]:
+                if cargo_sel != "Todos" and cargo_sel.lower() not in cargo.lower():
+                    continue
+                if busca_lower and busca_lower not in nome.lower():
+                    continue
+                membros_filtrados.append((nome, cargo))
+            if membros_filtrados or visao == "Completa (todos os membros)":
+                squads_visiveis[sq_nome] = (sq_data["cor"], membros_filtrados if membros_filtrados else sq_data["membros"])
+
+        if not squads_visiveis:
+            continue
+
+        total_cap = sum(len(m) for _, m in squads_visiveis.values())
+
+        with st.expander(f"**{cap_data['titulo']}** — {len(squads_visiveis)} squad(s) · {total_cap} membros", expanded=True):
+            cols_squads = st.columns(min(len(squads_visiveis), 4))
+            for idx, (sq_nome, (cor, membros_lista)) in enumerate(squads_visiveis.items()):
+                col_idx = idx % min(len(squads_visiveis), 4)
+                with cols_squads[col_idx]:
+                    st.markdown(
+                        f'<div class="sq-pill" style="background:{cor}">{sq_nome} · {len(membros_lista)}</div>',
+                        unsafe_allow_html=True
+                    )
+                    tags_html = ""
+                    for nome, cargo in membros_lista:
+                        hl = "hl" if busca_lower and busca_lower in nome.lower() else ""
+                        tags_html += f'<span class="membro-tag {hl}">{nome} <b>{cargo}</b></span>'
+                    st.markdown(tags_html, unsafe_allow_html=True)
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Gráfico distribuição por cargo ───────────────────────────
+    st.markdown("---")
+    st.markdown('<div class="section-title">Distribuição por cargo técnico</div>', unsafe_allow_html=True)
+
+    cargo_count: dict = {}
+    for cap in SQUADS.values():
+        for sq in cap["squads"].values():
+            for _, cargo in sq["membros"]:
+                cargo_count[cargo] = cargo_count.get(cargo, 0) + 1
+
+    df_cargos = pd.DataFrame(sorted(cargo_count.items(), key=lambda x: -x[1]), columns=["Cargo","Membros"])
+    fig_cargos = px.bar(
+        df_cargos, x="Membros", y="Cargo", orientation="h",
+        color="Membros", color_continuous_scale=["#BDD7EE","#E05A2B"],
+        text="Membros"
+    )
+    fig_cargos.update_traces(textposition="outside")
+    fig_cargos.update_layout(
+        height=max(300, len(df_cargos)*32),
+        plot_bgcolor="white", paper_bgcolor="rgba(0,0,0,0)",
+        margin=dict(t=10,b=10,r=40), coloraxis_showscale=False
+    )
+    st.plotly_chart(fig_cargos, use_container_width=True)
