@@ -38,41 +38,40 @@ st.markdown("""
   .stDataFrame { border-radius: 8px; overflow: hidden; }
 
   /* ── Estrutura das Squads ── */
-  .squad-wrap { font-family: sans-serif; }
   .squad-dir {
-      display: inline-block; background: #E05A2B; color: #fff;
-      border-radius: 8px; padding: 6px 18px; font-size: 13px;
+      display: inline-flex; flex-direction: column; align-items: center;
+      background: #E05A2B; color: #fff;
+      border-radius: 8px; padding: 8px 20px; font-size: 13px;
       font-weight: 600; text-align: center; margin: 4px;
+      min-width: 140px;
   }
-  .squad-dir small { display: block; font-size: 10px; opacity: .8; font-weight: 400; }
+  .squad-dir small { font-size: 10px; opacity: .8; font-weight: 400; margin-top: 2px; }
   .squad-coord {
-      display: inline-block; background: #2C1A1A; color: #fff;
-      border-radius: 6px; padding: 4px 14px; font-size: 12px;
+      display: inline-flex; flex-direction: column; align-items: center;
+      background: #2C1A1A; color: #fff;
+      border-radius: 6px; padding: 6px 16px; font-size: 12px;
       font-weight: 500; text-align: center; margin: 3px;
+      min-width: 120px;
   }
-  .squad-coord small { display: block; font-size: 10px; opacity: .7; }
-  .squad-cap-block {
-      border: 1px solid #e0dcd8; border-radius: 10px;
-      padding: 10px 12px; background: #FAF8F6;
-      margin-bottom: 8px;
+  .squad-coord small { font-size: 10px; opacity: .7; margin-top: 2px; }
+  .sq-header {
+      display: inline-flex; flex-direction: column; align-items: center;
+      color: #fff; font-size: 11px; font-weight: 700;
+      padding: 4px 12px; border-radius: 6px; margin: 3px 0 6px 0;
+      min-width: 100px; text-align: center;
   }
-  .squad-cap-title {
-      font-size: 12px; font-weight: 700; color: #2C1A1A;
-      border-bottom: 2px solid #E05A2B; padding-bottom: 4px;
-      margin-bottom: 8px;
+  .sq-header small { font-size: 9px; font-weight: 400; opacity: .85; margin-top: 1px; }
+  .membro-box {
+      display: inline-flex; flex-direction: column; align-items: center;
+      background: #fff; border: 1px solid #e0dcd8; border-radius: 7px;
+      padding: 5px 10px; margin: 3px; font-size: 11px; font-weight: 500;
+      color: #2C1A1A; text-align: center; min-width: 90px;
   }
-  .sq-pill {
-      display: inline-block; color: #fff; font-size: 10px;
-      font-weight: 600; padding: 2px 10px; border-radius: 4px;
-      margin-bottom: 4px;
-  }
-  .membro-tag {
-      display: inline-block; font-size: 10px; padding: 1px 7px;
-      border: 1px solid #ddd; border-radius: 4px;
-      background: #fff; color: #333; margin: 1px;
-  }
-  .membro-tag b { color: #888; font-weight: 400; }
-  .membro-tag.hl { background: #FEF9C3; border-color: #CA8A04; color: #713F12; }
+  .membro-box small { font-size: 9px; color: #888; font-weight: 400; margin-top: 1px; }
+  .membro-box.hl { background: #FEF9C3; border-color: #CA8A04; color: #713F12; }
+  .membro-box.hl small { color: #92400E; }
+  .sq-section { margin-bottom: 16px; }
+  .sq-membros { display: flex; flex-wrap: wrap; gap: 0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1102,11 +1101,9 @@ elif pagina == "🏢 Estrutura das Squads":
     busca_lower = busca.strip().lower()
 
     for cap_key, cap_data in SQUADS.items():
-        # Filtro por líder
         if lider_sel != "Todos" and cap_data["titulo"] != lider_sel:
             continue
 
-        # Verifica se há algo para mostrar
         squads_visiveis = {}
         for sq_nome, sq_data in cap_data["squads"].items():
             if squad_sel != "Todas" and sq_nome != squad_sel:
@@ -1118,8 +1115,9 @@ elif pagina == "🏢 Estrutura das Squads":
                 if busca_lower and busca_lower not in nome.lower():
                     continue
                 membros_filtrados.append((nome, cargo))
-            if membros_filtrados or visao == "Completa (todos os membros)":
-                squads_visiveis[sq_nome] = (sq_data["cor"], membros_filtrados if membros_filtrados else sq_data["membros"])
+            lista_final = membros_filtrados if membros_filtrados else (sq_data["membros"] if visao == "Completa (todos os membros)" else [])
+            if lista_final:
+                squads_visiveis[sq_nome] = (sq_data["cor"], lista_final)
 
         if not squads_visiveis:
             continue
@@ -1127,41 +1125,21 @@ elif pagina == "🏢 Estrutura das Squads":
         total_cap = sum(len(m) for _, m in squads_visiveis.values())
 
         with st.expander(f"**{cap_data['titulo']}** — {len(squads_visiveis)} squad(s) · {total_cap} membros", expanded=True):
-            cols_squads = st.columns(min(len(squads_visiveis), 4))
-            for idx, (sq_nome, (cor, membros_lista)) in enumerate(squads_visiveis.items()):
-                col_idx = idx % min(len(squads_visiveis), 4)
-                with cols_squads[col_idx]:
-                    st.markdown(
-                        f'<div class="sq-pill" style="background:{cor}">{sq_nome} · {len(membros_lista)}</div>',
-                        unsafe_allow_html=True
+            for sq_nome, (cor, membros_lista) in squads_visiveis.items():
+                # Cabeçalho do squad
+                st.markdown(
+                    f'<div class="sq-header" style="background:{cor}">'
+                    f'{sq_nome}<small>{len(membros_lista)} membros</small></div>',
+                    unsafe_allow_html=True
+                )
+                # Membros como caixinhas individuais
+                html = '<div class="sq-membros">'
+                for nome, cargo in membros_lista:
+                    hl = "hl" if busca_lower and busca_lower in nome.lower() else ""
+                    html += (
+                        f'<div class="membro-box {hl}">'
+                        f'{nome}<small>{cargo}</small>'
+                        f'</div>'
                     )
-                    tags_html = ""
-                    for nome, cargo in membros_lista:
-                        hl = "hl" if busca_lower and busca_lower in nome.lower() else ""
-                        tags_html += f'<span class="membro-tag {hl}">{nome} <b>{cargo}</b></span>'
-                    st.markdown(tags_html, unsafe_allow_html=True)
-                    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── Gráfico distribuição por cargo ───────────────────────────
-    st.markdown("---")
-    st.markdown('<div class="section-title">Distribuição por cargo técnico</div>', unsafe_allow_html=True)
-
-    cargo_count: dict = {}
-    for cap in SQUADS.values():
-        for sq in cap["squads"].values():
-            for _, cargo in sq["membros"]:
-                cargo_count[cargo] = cargo_count.get(cargo, 0) + 1
-
-    df_cargos = pd.DataFrame(sorted(cargo_count.items(), key=lambda x: -x[1]), columns=["Cargo","Membros"])
-    fig_cargos = px.bar(
-        df_cargos, x="Membros", y="Cargo", orientation="h",
-        color="Membros", color_continuous_scale=["#BDD7EE","#E05A2B"],
-        text="Membros"
-    )
-    fig_cargos.update_traces(textposition="outside")
-    fig_cargos.update_layout(
-        height=max(300, len(df_cargos)*32),
-        plot_bgcolor="white", paper_bgcolor="rgba(0,0,0,0)",
-        margin=dict(t=10,b=10,r=40), coloraxis_showscale=False
-    )
-    st.plotly_chart(fig_cargos, use_container_width=True)
+                html += '</div><br>'
+                st.markdown(html, unsafe_allow_html=True)
